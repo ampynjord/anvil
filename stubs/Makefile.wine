@@ -1,0 +1,285 @@
+# Makefile.wine — Build combase_anvil.dll for Wine
+#
+# Prerequisites (Linux host):
+#   apt install gcc-mingw-w64-x86-64 wine-dev  (or wine-devel on RPM distros)
+#
+# Usage:
+#   make -f Makefile.wine          # builds both 32-bit and 64-bit DLLs
+#   make -f Makefile.wine 64       # 64-bit only
+#   make -f Makefile.wine 32       # 32-bit only
+#   make -f Makefile.wine clean
+#   make -f Makefile.wine test     # compile and run the HSTRING unit tests
+#
+# After building, install into a Wine prefix:
+#   mkdir -p ~/.wine/drive_c/windows/system32/  (64-bit)
+#   cp out/combase_anvil64.dll ~/.wine/drive_c/windows/system32/combase.dll
+#   # Then launch with:
+#   # WINEDLLOVERRIDES="combase=b,n" wine Calculator.exe
+
+# ---------------------------------------------------------------------------
+# Toolchain
+# ---------------------------------------------------------------------------
+
+CC64  = x86_64-w64-mingw32-gcc
+CC32  = i686-w64-mingw32-gcc
+DLLTOOL64 = x86_64-w64-mingw32-dlltool
+DLLTOOL32 = i686-w64-mingw32-dlltool
+STRIP64   = x86_64-w64-mingw32-strip
+STRIP32   = i686-w64-mingw32-strip
+
+# ---------------------------------------------------------------------------
+# Sources and output
+# ---------------------------------------------------------------------------
+
+SRC       = combase_anvil.c xaml_stubs.c core_objects.c com_stubs.c p4_stubs.c p5_stubs.c storage_stubs.c hook_engine.c pkg_identity.c dispatcher_stubs.c dxgi_stubs.c sysui_stubs.c pkg_winrt.c xaml_controls_stubs.c composition_stubs.c xaml_renderer.c
+HEADERS   = winrt_types.h
+OUT_DIR   = out
+
+DLL64     = $(OUT_DIR)/combase_anvil64.dll
+DLL32     = $(OUT_DIR)/combase_anvil32.dll
+DEF_FILE  = $(OUT_DIR)/combase_anvil.def
+
+TEST_SRC    = test_combase_anvil.c
+TEST_BIN    = $(OUT_DIR)/test_combase
+CHAIN_EXE   = $(OUT_DIR)/test_activation_chain.exe
+COREWIN_EXE = $(OUT_DIR)/test_core_window.exe
+P4_EXE      = $(OUT_DIR)/test_p4_stubs.exe
+P5_EXE      = $(OUT_DIR)/test_p5_stubs.exe
+PKG_EXE     = $(OUT_DIR)/test_pkg_identity.exe
+STORAGE_EXE = $(OUT_DIR)/test_storage_stubs.exe
+SYSTEM_EXE  = $(OUT_DIR)/test_system_stubs.exe
+
+# ---------------------------------------------------------------------------
+# Compiler flags
+# ---------------------------------------------------------------------------
+
+# -D__WINE__ is intentionally NOT set here so that the stub compiles with
+# winrt_types.h (our own minimal headers) rather than Wine's SDK headers.
+# When integrating into the actual Wine build tree, remove this note and
+# use Wine's standard MODULE / SPEC file mechanism instead.
+
+CFLAGS_COMMON = \
+    -O2 \
+    -Wall \
+    -Wextra \
+    -Wno-unused-parameter \
+    -fno-stack-protector \
+    -I.
+
+CFLAGS64 = $(CFLAGS_COMMON) -m64
+CFLAGS32 = $(CFLAGS_COMMON) -m32
+
+LDFLAGS_DLL = \
+    -shared \
+    -Wl,--kill-at \
+    -Wl,--out-implib,$(OUT_DIR)/combase_anvil.lib
+
+# ---------------------------------------------------------------------------
+# Exported symbols (.def file)
+#
+# Matches the combase_anvil.c public surface.  The Wine DLL override
+# mechanism requires that our DLL export exactly these names (ordinals
+# can vary; only the names matter for LoadLibrary / GetProcAddress).
+# ---------------------------------------------------------------------------
+
+$(DEF_FILE): | $(OUT_DIR)
+	@echo "LIBRARY combase_anvil" > $@
+	@echo "EXPORTS" >> $@
+	@echo "  RoInitialize" >> $@
+	@echo "  RoUninitialize" >> $@
+	@echo "  RoGetActivationFactory" >> $@
+	@echo "  RoActivateInstance" >> $@
+	@echo "  RoGetErrorInfo" >> $@
+	@echo "  RoSetErrorInfo" >> $@
+	@echo "  WindowsCreateString" >> $@
+	@echo "  WindowsCreateStringReference" >> $@
+	@echo "  WindowsDeleteString" >> $@
+	@echo "  WindowsDuplicateString" >> $@
+	@echo "  WindowsGetStringRawBuffer" >> $@
+	@echo "  WindowsGetStringLen" >> $@
+	@echo "  WindowsIsStringEmpty" >> $@
+	@echo "  WindowsConcatString" >> $@
+	@echo "  WindowsCompareStringOrdinal" >> $@
+	@echo "  anvil_register_factory" >> $@
+	@echo "  anvil_dump_factories" >> $@
+	@echo "  CoInitialize" >> $@
+	@echo "  CoInitializeEx" >> $@
+	@echo "  CoUninitialize" >> $@
+	@echo "  CoTaskMemAlloc" >> $@
+	@echo "  CoTaskMemFree" >> $@
+	@echo "  CoTaskMemRealloc" >> $@
+	@echo "  CoGetMalloc" >> $@
+	@echo "  StringFromGUID2" >> $@
+	@echo "  StringFromCLSID" >> $@
+	@echo "  StringFromIID" >> $@
+	@echo "  CLSIDFromString" >> $@
+	@echo "  IIDFromString" >> $@
+	@echo "  CLSIDFromProgID" >> $@
+	@echo "  ProgIDFromCLSID" >> $@
+	@echo "  CoCreateGuid" >> $@
+	@echo "  CoInitializeSecurity" >> $@
+	@echo "  CoGetClassObject" >> $@
+	@echo "  CoCreateInstance" >> $@
+	@echo "  CoCreateInstanceEx" >> $@
+	@echo "  CoGetApartmentType" >> $@
+	@echo "  CoGetCurrentProcess" >> $@
+	@echo "  CoGetContextToken" >> $@
+	@echo "  CoGetDefaultContext" >> $@
+	@echo "  CoGetObjectContext" >> $@
+	@echo "  CoRegisterClassObject" >> $@
+	@echo "  CoRevokeClassObject" >> $@
+	@echo "  CoDisconnectObject" >> $@
+	@echo "  CoSuspendClassObjects" >> $@
+	@echo "  CoResumeClassObjects" >> $@
+	@echo "  CoGetInterfaceAndReleaseStream" >> $@
+	@echo "  CoMarshalInterThreadInterfaceInStream" >> $@
+	@echo "  CoIsHandlerConnected" >> $@
+	@echo "  CoFileTimeNow" >> $@
+	@echo "  CoFreeLibrary" >> $@
+	@echo "  CoLockObjectExternal" >> $@
+	@echo "  CoRegisterInitializeSpy" >> $@
+	@echo "  CoRevokeInitializeSpy" >> $@
+	@echo "  CoAllowSetForegroundWindow" >> $@
+	@echo "  CoAddRefServerProcess" >> $@
+	@echo "  CoReleaseServerProcess" >> $@
+	@echo "  CoRegisterChannelHook" >> $@
+	@echo "  CoWaitForMultipleHandles" >> $@
+	@echo "  CreateStreamOnHGlobal" >> $@
+	@echo "  GetHGlobalFromStream" >> $@
+	@echo "  PropVariantClear" >> $@
+	@echo "  PropVariantCopy" >> $@
+	@echo "  FreePropVariantArray" >> $@
+	@echo "  DllRegisterServer" >> $@
+	@echo "  DllUnregisterServer" >> $@
+	@echo "  anvil_install_pkg_hooks" >> $@
+	@echo "  anvil_remove_pkg_hooks" >> $@
+	@echo "  GetCurrentPackageId" >> $@
+	@echo "  GetCurrentPackageFullName" >> $@
+	@echo "  GetCurrentPackageFamilyName" >> $@
+	@echo "  GetCurrentApplicationUserModelId" >> $@
+	@echo "  GetCurrentPackagePath" >> $@
+	@echo "  GetPackagePathByFullName" >> $@
+	@echo "  OpenPackageInfoByFullName" >> $@
+	@echo "  ClosePackageInfo" >> $@
+	@echo "  anvil_install_dxgi_hooks" >> $@
+	@echo "  anvil_remove_dxgi_hooks" >> $@
+	@echo "  anvil_get_dispatcher" >> $@
+	@echo "  anvil_completed_action" >> $@
+	@echo "  anvil_get_corewindow_hwnd" >> $@
+	@echo "  anvil_renderer_paint" >> $@
+	@echo "  anvil_renderer_click" >> $@
+	@echo "  anvil_renderer_set_display" >> $@
+
+$(OUT_DIR):
+	mkdir -p $(OUT_DIR)
+
+# ---------------------------------------------------------------------------
+# Build targets
+# ---------------------------------------------------------------------------
+
+.PHONY: all 64 32 clean test tests chain install help
+
+all: 64 32 $(CHAIN_EXE) $(COREWIN_EXE) $(P4_EXE) $(P5_EXE) $(PKG_EXE) $(STORAGE_EXE) $(SYSTEM_EXE)
+
+tests: $(CHAIN_EXE) $(COREWIN_EXE) $(P4_EXE) $(P5_EXE) $(PKG_EXE) $(STORAGE_EXE) $(SYSTEM_EXE)
+
+64: $(DLL64)
+
+32: $(DLL32)
+
+EXTRA_LIBS = -lm -lgdi32
+
+$(DLL64): $(SRC) $(HEADERS) $(DEF_FILE) | $(OUT_DIR)
+	$(CC64) $(CFLAGS64) $(LDFLAGS_DLL) \
+	    -Wl,--output-def,$(OUT_DIR)/combase64.def \
+	    -o $@ $(SRC) $(EXTRA_LIBS)
+	$(STRIP64) --strip-debug $@
+	@echo "[anvil] Built 64-bit: $@"
+
+$(DLL32): $(SRC) $(HEADERS) $(DEF_FILE) | $(OUT_DIR)
+	$(CC32) $(CFLAGS32) $(LDFLAGS_DLL) \
+	    -Wl,--output-def,$(OUT_DIR)/combase32.def \
+	    -o $@ $(SRC) $(EXTRA_LIBS)
+	$(STRIP32) --strip-debug $@
+	@echo "[anvil] Built 32-bit: $@"
+
+# ---------------------------------------------------------------------------
+# Unit test — compiles the C file natively (Linux) for fast iteration on the
+# HSTRING and factory registry logic without needing a full Wine environment.
+# ---------------------------------------------------------------------------
+
+test: $(TEST_BIN)
+	@echo "[anvil] Running HSTRING + factory registry tests..."
+	./$(TEST_BIN)
+
+$(TEST_BIN): combase_anvil.c $(HEADERS) $(TEST_SRC) | $(OUT_DIR)
+	gcc -O0 -g -Wall -fshort-wchar -I. -o $@ combase_anvil.c $(TEST_SRC) -DANVIL_UNIT_TEST
+	@echo "[anvil] Built test binary: $@"
+
+$(CHAIN_EXE): test_activation_chain.c | $(OUT_DIR)
+	$(CC64) -O0 -g -o $@ test_activation_chain.c -lkernel32 -luser32
+	@echo "[anvil] Built chain harness: $@"
+
+$(COREWIN_EXE): test_core_window.c | $(OUT_DIR)
+	$(CC64) -O0 -g -o $@ test_core_window.c -lkernel32 -luser32
+	@echo "[anvil] Built core-window harness: $@"
+
+$(P4_EXE): test_p4_stubs.c | $(OUT_DIR)
+	$(CC64) -O0 -g -o $@ test_p4_stubs.c -lkernel32
+	@echo "[anvil] Built P4 stubs harness: $@"
+
+$(P5_EXE): test_p5_stubs.c | $(OUT_DIR)
+	$(CC64) -O0 -g -o $@ test_p5_stubs.c -lkernel32
+	@echo "[anvil] Built P5 stubs harness: $@"
+
+$(PKG_EXE): test_pkg_identity.c | $(OUT_DIR)
+	$(CC64) -O0 -g -o $@ test_pkg_identity.c -lkernel32
+	@echo "[anvil] Built pkg-identity harness: $@"
+
+$(STORAGE_EXE): test_storage_stubs.c $(HEADERS) | $(OUT_DIR)
+	$(CC64) -O0 -g -I. -o $@ test_storage_stubs.c -lkernel32
+	@echo "[anvil] Built storage stubs harness: $@"
+
+$(SYSTEM_EXE): test_system_stubs.c $(HEADERS) | $(OUT_DIR)
+	$(CC64) -O0 -g -I. -o $@ test_system_stubs.c -lkernel32
+	@echo "[anvil] Built system stubs harness: $@"
+
+# ---------------------------------------------------------------------------
+# Install into a Wine prefix
+# ---------------------------------------------------------------------------
+
+WINE_PREFIX ?= $(HOME)/.wine
+
+install: 64 32
+	@echo "[anvil] Installing into Wine prefix: $(WINE_PREFIX)"
+	cp $(DLL64) $(WINE_PREFIX)/drive_c/windows/system32/combase.dll
+	cp $(DLL32) $(WINE_PREFIX)/drive_c/windows/syswow64/combase.dll
+	@echo "[anvil] Done. Launch with:"
+	@echo "  WINEDLLOVERRIDES=\"combase=b,n\" wine your_uwp_app.exe"
+
+# ---------------------------------------------------------------------------
+# Clean
+# ---------------------------------------------------------------------------
+
+clean:
+	rm -rf $(OUT_DIR)
+
+# ---------------------------------------------------------------------------
+# Help
+# ---------------------------------------------------------------------------
+
+help:
+	@echo "Makefile.wine — Anvil combase stub build"
+	@echo ""
+	@echo "Targets:"
+	@echo "  all      Build 64-bit and 32-bit DLLs (default)"
+	@echo "  64       Build 64-bit DLL only"
+	@echo "  32       Build 32-bit DLL only"
+	@echo "  test     Build and run native unit tests"
+	@echo "  install  Install DLLs into WINE_PREFIX (default: ~/.wine)"
+	@echo "  clean    Remove build artifacts"
+	@echo ""
+	@echo "Variables:"
+	@echo "  WINE_PREFIX  Wine prefix directory (default: ~/.wine)"
+	@echo "  CC64         64-bit MinGW compiler (default: x86_64-w64-mingw32-gcc)"
+	@echo "  CC32         32-bit MinGW compiler (default: i686-w64-mingw32-gcc)"

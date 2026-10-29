@@ -1,0 +1,22 @@
+# Binaires et paquets tiers (Microsoft Calculator) : jamais sur git
+calculator_src/
+anvil_extracted/
+msix_staging/
+*.msix
+*.appx
+
+# Sorties de compilation et rapports generes
+stubs/out/
+reports/
+*.exe
+*.dll
+*.o
+*.obj
+
+# Local
+anvil_vm.pub
+.vscode/
+.env
+.env.*
+*.log
+.DS_Store

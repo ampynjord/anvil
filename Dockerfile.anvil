@@ -1,0 +1,17 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# MinGW cross-compiler, Wine, Xvfb (headless display), Python3
+RUN apt-get update -qq && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        gcc-mingw-w64-x86-64 \
+        binutils-mingw-w64-x86-64 \
+        wine64 \
+        xvfb \
+        python3 \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -s /usr/bin/wine64 /usr/local/bin/wine64-stable
+
+WORKDIR /anvil

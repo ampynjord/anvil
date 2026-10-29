@@ -1,23 +1,23 @@
 # Anvil
 
-Projet de recherche : faire tourner des applications **UWP** (Universal Windows Platform) sous Linux en étendant la couche de compatibilité Wine.
+Research project: running **UWP** (Universal Windows Platform) applications on Linux by extending the Wine compatibility layer.
 
-Wine réimplémente l'API Win32, mais pas la pile WinRT/UWP (activation COM via le Windows Runtime, bac à sable AppContainer, interface XAML, identité de paquet). Anvil étudie les shims, stubs et changements d'architecture minimaux pour amorcer cette pile. C'est un instrument de recherche et une preuve de concept, pas un fork de Wine : le succès se mesure à la capacité d'exécuter de simples binaires UWP jusqu'à leur premier appel WinRT/XAML.
+Wine reimplements the Win32 API, but not the WinRT/UWP stack (COM activation through the Windows Runtime, AppContainer sandbox, XAML UI, package identity). Anvil studies the minimal shims, stubs and architectural changes needed to bootstrap that stack. It is a research instrument and proof of concept, not a Wine fork: success is measured by the ability to run simple UWP binaries up to their first WinRT/XAML call.
 
-La spécification technique est dans [`RESEARCH.md`](RESEARCH.md).
+The technical specification is in [`RESEARCH.md`](RESEARCH.md).
 
-## Contenu
+## Contents
 
-| Chemin | Rôle |
+| Path | Role |
 | --- | --- |
-| `RESEARCH.md` | Spécification et notes de recherche |
-| `stubs/` | Stubs C : WinRT (`combase`), composition, XAML, stockage, identité de paquet, DXGI, moteur de hooks, tests |
-| `tools/anvil_msix.py` | Lecture de paquets MSIX |
-| `anvil_inspector.py` | Inspection d'un paquet |
-| `Dockerfile.anvil`, `setup_anvil_vm.sh`, `bootstrap_standalone.sh`, `run_calculator.sh` | Environnement de test et lancement |
+| `RESEARCH.md` | Specification and research notes |
+| `stubs/` | C stubs: WinRT (`combase`), composition, XAML, storage, package identity, DXGI, hook engine, tests |
+| `tools/anvil_msix.py` | MSIX package reader |
+| `anvil_inspector.py` | Package inspection |
+| `Dockerfile.anvil`, `setup_anvil_vm.sh`, `bootstrap_standalone.sh`, `run_calculator.sh` | Test environment and launch scripts |
 
-Les paquets tiers analysés (extraction de paquets MSIX, code source d'applications Microsoft) ne sont volontairement pas inclus dans ce dépôt.
+Third-party packages used for analysis (extracted MSIX packages, source code of Microsoft applications) are deliberately not included in this repository.
 
-## Licence
+## License
 
-Code propriétaire, tous droits réservés (voir [`LICENSE`](LICENSE)).
+Proprietary code, all rights reserved (see [`LICENSE`](LICENSE)).
